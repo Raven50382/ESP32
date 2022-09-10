@@ -1,0 +1,75 @@
+#服务端，热点模式
+
+import socket
+import network
+import time
+from machine import Pin
+
+#创建wlan
+def wlan_creat():
+    print("AP creating...")
+    #创建一个WLAN对象，并将其设置为AP模式
+    ap = network.WLAN(network.AP_IF)
+    #设置该AP的名称
+    ap.config(essid = 'ESP32-TestAP')
+    #使能该对象
+    ap.active(True)
+    print("Success, IPconfig:")
+    #打印输出IP地址
+    print(ap.ifconfig())
+    return ap
+
+#控制LED的函数
+#当灯灭的时候点亮，当灯亮的时候熄灭
+def led_control():
+    p2 = Pin(2,Pin.OUT)
+    if p2.value() == 1:
+        p2.value(0)
+    else:
+        p2.value(1)
+    
+#创建套接字
+def socket_init(ap):
+    #声明该套接字的IP为本地IP
+    IP = ap.ifconfig()[0]
+    print("IP:",IP)
+    PORT = 8080
+    BUFLEN = 512 #发送字节为512，最好与接收端保持一致
+    
+    #创建套接字对象
+    s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+    #绑定套接字IP和端口
+    s.bind((IP,PORT))
+    #设置最大连接数为5
+    s.listen(5)
+    print("服务端启动成功，在{}端口等待客户端连接...".format(PORT))
+    #获取听取到的连接信息，并拆包得到建立连接的新套接字以及对方的IP地址
+    dataSocket, addr = s.accept()
+    print("接收一个客户端连接",addr)
+    
+    while True:
+        #以BUFLEN设置的长度读取从套接字dataSocket里监听到的信息
+        recved = dataSocket.recv(BUFLEN)
+        
+        #如果没有返回的信息，跳出循环
+        if not recved:
+            break
+        #将信息解码
+        info = recved.decode()
+        print("收到对方信息：",info)
+        
+        #如果对方发送的信息为“hello”则控制灯的亮灭
+        if info == 'hello':
+            led_control()
+        #向对方也发送一个Hello
+        dataSocket.send("Hello".encode())
+    dataSocket.close()
+    s.close()
+    
+    
+def main():
+    ap = wlan_creat()
+    socket_init(ap)
+    
+if __name__ == "__main__":
+    main()
