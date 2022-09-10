@@ -1,0 +1,71 @@
+#客户端程序
+
+import network
+import time
+import socket
+from machine import Pin
+
+#连接服务端热点
+def wlan_creat():
+    #创建wlan对象
+    wlan = network.WLAN(network.STA_IF)
+    #将其使能
+    wlan.active(True)
+    
+    #如果WiFi没有连接，则连接进行连接
+    if not wlan.isconnected():
+        print(wlan.scan())  
+        wlan.connect('ESP32-TestAP','')#此处填写的是我的服务端设置的热点名称
+
+    i = 1
+    while not wlan.isconnected():      #当执行连接wifi指令但还没连接wifi时，持续输出“connecting...”
+        print("connecting...{}".format(i))
+        i += 1
+        time.sleep(1)
+    print(wlan.ifconfig())             #连接之后输出当前的IP地址
+    
+    
+#该函数用于创建套接字    
+def socket_init():
+    #创建pin5对象，设置为上拉输入，这一步的目的是给一个按钮分配io口。
+    pin5 = Pin(5,Pin.IN,Pin.PULL_UP)
+    
+    #声明socket的连接地址。即服务端IP和端口
+    IP = '192.168.4.1'
+    SERVER_PORT = 8080
+    BUFLEN = 512 #接收字节长度
+    
+    #创建socket对象
+    s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+    #绑定socket的IP和端口
+    s.connect((IP,SERVER_PORT))
+    
+    
+    while True:
+        #当pin5连接的按键被按动的时候，向所连接的套接字发送“hello”编码过后的数据。
+        #encode不填写时，默认编码格式为UTF8
+        if pin5.value() == 0:
+            toSend = "hello"
+            s.send(toSend.encode())
+            #接收对方回传的消息
+            recved = s.recv(BUFLEN)
+            #当没有回传消息的时候，跳出循环。
+            if not recved:
+                break
+            #将对方回传的消息解码后打印输出。decode不填默认解码格式为UTF8
+            print(recved.decode())
+            
+            #这一步的目的是等待按键弹起，若未弹起则一直卡在这个while中
+            while pin5.value() == 0:
+                pass
+    #关闭套接字
+    s.close()
+        
+    
+    
+def main():
+    wlan_creat()
+    socket_init()
+    
+if __name__ == "__main__":
+    main()
